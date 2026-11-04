@@ -325,8 +325,8 @@ function Row({ label, value }: { label: string; value: string }) {
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1.5">
-      <dt className="w-20 shrink-0 text-gray-500">{label}</dt>
-      <dd className="w-44 shrink-0">{children}</dd>
+      <dt className="w-16 shrink-0 text-gray-500">{label}</dt>
+      <dd className="w-full max-w-[11rem] shrink-0">{children}</dd>
     </div>
   );
 }

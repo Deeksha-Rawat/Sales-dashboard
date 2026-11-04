@@ -83,6 +83,8 @@ describe("DealsTable virtualization", () => {
 });
 
 describe("DealsTable row dropdowns", () => {
+  // Stage and priority are editable right in the row via a pill dropdown; value/owner stay
+  // read-only — those only change through the detail drawer's edit mode.
   it("the stage dropdown on a rendered row actually opens and commits a pick", async () => {
     const user = userEvent.setup();
     seedLargeDataset(500);
@@ -127,5 +129,19 @@ describe("DealsTable row dropdowns", () => {
     const updatedRow = screen.getAllByRole("row")[0];
     expect(within(updatedRow).getByRole("button", { name: "Change priority" })).toHaveTextContent("High");
     expect(useDealsStore.getState().deals[firstId].priority).toBe("high");
+  });
+
+  it("renders value and owner as plain text, not editable controls", () => {
+    seedLargeDataset(500);
+    const firstId = useDealsStore.getState().order[0];
+    useDealsStore.setState((s) => ({
+      deals: { ...s.deals, [firstId]: { ...s.deals[firstId], value: 123456, owner: "Priya Patel" } },
+    }));
+
+    render(<DealsTable onOpenDetail={() => {}} />);
+
+    const firstRow = screen.getAllByRole("row")[0];
+    expect(within(firstRow).getByText("Priya Patel")).toBeInTheDocument();
+    expect(within(firstRow).queryByRole("button", { name: /₹/ })).not.toBeInTheDocument();
   });
 });

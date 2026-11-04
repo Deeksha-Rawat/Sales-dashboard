@@ -50,11 +50,14 @@ export function Dialog({
         aria-label={title}
         tabIndex={-1}
         className={cn(
-          "w-full max-w-lg rounded-lg bg-white p-5 text-gray-900 shadow-xl focus:outline-none",
+          // max-h/overflow so a tall form (e.g. Add Lead) scrolls within the dialog instead of
+          // being cut off by a short mobile viewport — the header stays pinned, only the body
+          // scrolls.
+          "flex max-h-[85vh] w-full max-w-lg flex-col rounded-lg bg-white p-5 text-gray-900 shadow-xl focus:outline-none",
           className
         )}
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex shrink-0 items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
@@ -64,7 +67,7 @@ export function Dialog({
             ✕
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto">{children}</div>
       </div>
     </div>,
     document.body

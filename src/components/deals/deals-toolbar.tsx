@@ -35,11 +35,16 @@ export function DealsToolbar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchDraft]);
 
+  const PANEL_WIDTH = 288; // matches the panel's w-72
   function updatePosition() {
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
-    setPos({ top: rect.bottom + 6, left: rect.left });
+    // Clamp to the viewport (8px margin) — on a narrow phone the Filters button can sit far
+    // enough right that anchoring the panel to its left edge would push most of a 288px-wide
+    // panel off-screen.
+    const left = Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 8);
+    setPos({ top: rect.bottom + 6, left: Math.max(8, left) });
   }
 
   // Portal the panel out to document.body (fixed position) rather than rendering it as a
@@ -108,7 +113,7 @@ export function DealsToolbar() {
           placeholder="Search deals, companies, owners…"
           value={searchDraft}
           onChange={(e) => setSearchDraft(e.target.value)}
-          className="max-w-xs"
+          className="w-full sm:max-w-xs"
           aria-label="Search deals"
         />
 
@@ -116,7 +121,7 @@ export function DealsToolbar() {
           value={filters.owner[0] ?? ""}
           onChange={(v) => setFilters({ owner: v ? [v] : [] })}
           aria-label="Filter by owner"
-          className="min-w-[9.5rem]"
+          className="min-w-[9.5rem] flex-1 sm:flex-none"
         >
           <Option value="">All owners</Option>
           {owners.map((o) => (
@@ -164,7 +169,7 @@ export function DealsToolbar() {
               role="dialog"
               aria-label="Filter deals"
               style={{ position: "fixed", top: pos.top, left: pos.left }}
-              className="z-40 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+              className="z-40 w-[min(18rem,calc(100vw-1rem))] rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
             >
               <div>
                 <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">Stage</p>

@@ -160,7 +160,7 @@ export function AddLeadDialog({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Owner">
             <Select size="sm" className="w-full" value={form.owner} onChange={(v) => patch({ owner: v })} aria-label="Owner">
               {OWNERS.map((o) => (
@@ -219,7 +219,7 @@ export function AddLeadDialog({ open, onClose }: { open: boolean; onClose: () =>
             aria-label="Close date"
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Contact name">
             <Input
               value={form.contactName}

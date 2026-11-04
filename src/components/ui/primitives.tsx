@@ -265,7 +265,11 @@ export function Select({
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={onKeyDown}
         className={cn(
-          "relative inline-flex w-fit items-center justify-between gap-1 border bg-white text-left font-medium text-gray-900 transition-colors",
+          // min-w-0 matters whenever this sits inside a flex/grid cell that can shrink (e.g. a
+          // table column): without it, a flex item's default min-width:auto keeps it at its
+          // content's natural width no matter what `className` says, so the trigger overflows
+          // into the next cell instead of letting the label's `truncate` span do its job.
+          "relative inline-flex w-fit min-w-0 items-center justify-between gap-1 border bg-white text-left font-medium text-gray-900 transition-colors",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-blue-600",
           "disabled:cursor-not-allowed disabled:opacity-50",
           pill ? "rounded-full border-transparent" : "rounded-md border-gray-300 hover:border-gray-400",
@@ -349,9 +353,14 @@ export function Menu({
     const popoverHeight = popoverRef.current?.offsetHeight ?? 120;
     const spaceBelow = window.innerHeight - rect.bottom;
     const openUpward = spaceBelow < popoverHeight + 8 && rect.top > popoverHeight + 8;
+    const rawLeft = align === "end" ? rect.right - popoverWidth : rect.left;
+    // Clamp to the viewport — a trigger near the screen edge (common on a narrow phone, since
+    // the table's Actions column sits at the far right) would otherwise push the popover
+    // partly off-screen.
+    const left = Math.min(Math.max(8, rawLeft), window.innerWidth - popoverWidth - 8);
     setPos({
       top: openUpward ? rect.top - popoverHeight - 4 : rect.bottom + 4,
-      left: align === "end" ? rect.right - popoverWidth : rect.left,
+      left,
     });
   }
 

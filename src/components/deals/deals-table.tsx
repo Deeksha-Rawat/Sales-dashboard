@@ -9,15 +9,12 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
-import { DealSummary } from "@/lib/deals/types";
+import { DealSummary, PRIORITIES, PRIORITY_LABELS, STAGES, STAGE_LABELS } from "@/lib/deals/types";
 import { useDealsStore, SortField } from "@/store/deals-store";
-import { Checkbox } from "@/components/ui/primitives";
-import { PrioritySelect, StageSelect, ValueCell } from "./cell-editors";
+import { Checkbox, Menu, Option, Select, type MenuItem } from "@/components/ui/primitives";
 import { RowStatusIndicator } from "./row-status";
-import { CompanyAvatar } from "./company-avatar";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
-import { cn, formatRelativeTime } from "@/lib/utils";
-import { Menu, type MenuItem } from "@/components/ui/primitives";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   Archive,
   ArrowDown,
@@ -37,6 +34,31 @@ const ROW_HEIGHT = 48;
 const estimateRowSize = () => ROW_HEIGHT;
 
 const FIXED_COLUMNS = new Set(["select", "status", "actions"]);
+// The checkbox and status-icon columns are icon-only and narrow (32px/24px) — the table's
+// standard px-3 cell padding was eating almost as much horizontal space as the columns
+// themselves, which is what read as a big gap between the checkbox and the deal name.
+const TIGHT_PADDING_COLUMNS = new Set(["select", "status"]);
+// Every column is centered except Deal — a name + company subtitle reads better left-aligned
+// than centered, especially once either line truncates.
+const LEFT_ALIGN_COLUMNS = new Set(["name"]);
+
+// Stage and priority are editable right in the row via these pill dropdowns (value/owner stay
+// read-only — those only change through the detail drawer's edit mode). Tones keep the pills
+// visually consistent with the colors the drawer/board use for the same stages/priorities.
+const STAGE_TONE: Record<string, string> = {
+  new_lead: "bg-gray-100 text-gray-700",
+  contacted: "bg-sky-100 text-sky-700",
+  demo_done: "bg-blue-100 text-blue-700",
+  proposal_sent: "bg-purple-100 text-purple-700",
+  negotiation: "bg-amber-100 text-amber-700",
+  won: "bg-green-100 text-green-700",
+  lost: "bg-red-100 text-red-700",
+};
+const PRIORITY_TONE: Record<string, string> = {
+  low: "bg-gray-100 text-gray-600",
+  medium: "bg-sky-100 text-sky-700",
+  high: "bg-rose-100 text-rose-700",
+};
 
 /** Fixed-width columns (checkbox, status icon) stay a set size; every other column grows/shrinks
  *  proportionally to its `size` so the table always fills the full width of its container
@@ -116,7 +138,7 @@ export function DealsTable({
           }}
         />
       ),
-      size: 36,
+      size: 32,
     },
     {
       id: "status",
@@ -127,7 +149,7 @@ export function DealsTable({
           onRetry={() => retry(row.original.id)}
         />
       ),
-      size: 36,
+      size: 24,
     },
     {
       accessorKey: "name",
@@ -135,7 +157,6 @@ export function DealsTable({
       size: 260,
       cell: ({ row }) => (
         <div className="flex w-full min-w-0 items-center gap-2">
-          <CompanyAvatar name={row.original.company} />
           <div className="min-w-0 text-left">
             <button
               onClick={() => onOpenDetail(row.original.id, "view")}
@@ -154,11 +175,24 @@ export function DealsTable({
       header: "Stage",
       size: 140,
       cell: ({ row }) => (
-        <StageSelect
+        <Select
+          pill
+          size="sm"
           value={row.original.stage}
           disabled={pending[row.original.id]?.status === "saving"}
-          onCommit={(v) => updateDeal(row.original.id, { stage: v }, { undoLabel: "stage change" })}
-        />
+          onChange={(v) => updateDeal(row.original.id, { stage: v as DealSummary["stage"] }, { undoLabel: "stage change" })}
+          // w-full (not a fixed px width) so it never overflows its table cell — the cell's
+          // actual width is set by the table's flex layout and can shrink below any fixed
+          // width once there isn't room for every column at its preferred size.
+          className={cn("w-full max-w-[132px] font-medium", STAGE_TONE[row.original.stage])}
+          aria-label="Change stage"
+        >
+          {STAGES.map((s) => (
+            <Option key={s} value={s}>
+              {STAGE_LABELS[s]}
+            </Option>
+          ))}
+        </Select>
       ),
     },
     {
@@ -166,11 +200,7 @@ export function DealsTable({
       header: "Value",
       size: 120,
       cell: ({ row }) => (
-        <ValueCell
-          value={row.original.value}
-          disabled={pending[row.original.id]?.status === "saving"}
-          onCommit={(v) => updateDeal(row.original.id, { value: v }, { undoLabel: "value change" })}
-        />
+        <span className="block truncate px-1.5 py-1 text-gray-700">{formatCurrency(row.original.value)}</span>
       ),
     },
     {
@@ -188,25 +218,29 @@ export function DealsTable({
       header: "Priority",
       size: 110,
       cell: ({ row }) => (
-        <PrioritySelect
+        <Select
+          pill
+          size="sm"
           value={row.original.priority}
           disabled={pending[row.original.id]?.status === "saving"}
-          onCommit={(v) => updateDeal(row.original.id, { priority: v }, { undoLabel: "priority change" })}
-        />
+          onChange={(v) =>
+            updateDeal(row.original.id, { priority: v as DealSummary["priority"] }, { undoLabel: "priority change" })
+          }
+          className={cn("w-full max-w-[104px] font-medium", PRIORITY_TONE[row.original.priority])}
+          aria-label="Change priority"
+        >
+          {PRIORITIES.map((p) => (
+            <Option key={p} value={p}>
+              {PRIORITY_LABELS[p]}
+            </Option>
+          ))}
+        </Select>
       ),
     },
     {
       accessorKey: "closeDate",
       header: "Close date",
       size: 110,
-    },
-    {
-      accessorKey: "updatedAt",
-      header: "Updated",
-      size: 100,
-      cell: ({ row }) => (
-        <span className="text-xs text-gray-500">{formatRelativeTime(row.original.updatedAt)}</span>
-      ),
     },
     {
       id: "actions",
@@ -310,8 +344,9 @@ export function DealsTable({
               key={header.id}
               style={columnStyle(header.column.id, header.getSize())}
               className={cn(
-                "flex items-center gap-1 px-3 py-2.5",
-                FIXED_COLUMNS.has(header.column.id) ? "justify-center text-center" : "justify-start text-left",
+                "flex min-w-0 items-center gap-1 py-2.5",
+                LEFT_ALIGN_COLUMNS.has(header.column.id) ? "justify-start text-left" : "justify-center text-center",
+                TIGHT_PADDING_COLUMNS.has(header.column.id) ? "px-1" : "px-3",
                 !FIXED_COLUMNS.has(header.column.id) && "cursor-pointer select-none"
               )}
               onClick={() => toggleSort(header.column.id)}
@@ -359,8 +394,14 @@ export function DealsTable({
                         key={cell.id}
                         style={columnStyle(cell.column.id, cell.column.getSize())}
                         className={cn(
-                          "flex items-center px-3",
-                          FIXED_COLUMNS.has(cell.column.id) ? "justify-center text-center" : "justify-start text-left"
+                          // min-w-0 lets a cell's content (a Select trigger, a truncated span)
+                          // actually shrink to the cell's real flex-allocated width instead of
+                          // defaulting to its content's natural min width and overflowing into
+                          // the next column — the bug behind stage/value columns overlapping.
+                          // Centered to match the header row above, except Deal (kept left-aligned).
+                          "flex min-w-0 items-center",
+                          LEFT_ALIGN_COLUMNS.has(cell.column.id) ? "justify-start text-left" : "justify-center text-center",
+                          TIGHT_PADDING_COLUMNS.has(cell.column.id) ? "px-1" : "px-3"
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
