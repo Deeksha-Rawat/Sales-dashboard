@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+@keyframes row-flash {
+  0% {
+    background-color: rgba(59, 130, 246, 0.18);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.row-flash {
+  animation: row-flash 2s ease-out;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.shimmer {
+  background-color: #e5e7eb;
+  background-image: linear-gradient(90deg, #e5e7eb 25%, #f0f1f3 37%, #e5e7eb 63%);
+  background-size: 400px 100%;
+  animation: shimmer-sweep 1.4s ease-in-out infinite;
+}
