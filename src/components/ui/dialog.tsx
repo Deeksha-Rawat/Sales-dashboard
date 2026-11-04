@@ -19,15 +19,25 @@ export function Dialog({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Keep the latest `onClose` in a ref rather than the effect's dependency array. Callers
+  // almost always pass an inline arrow function, which is a new reference on every render —
+  // typing into any field inside the dialog re-renders the parent, which would otherwise
+  // re-run this effect and yank focus from the field (via `ref.current?.focus()`) back to
+  // the dialog shell after every single keystroke.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     ref.current?.focus();
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 

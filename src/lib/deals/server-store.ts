@@ -85,8 +85,11 @@ export function applyUpdate(
 
   let record = current;
   if (injectConflict) {
-    // Simulate a concurrent writer landing a change a moment earlier.
-    record = { ...current, version: current.version + 1, updatedAt: new Date().toISOString() };
+    // Simulate a concurrent writer landing a change a moment earlier — reuse the same
+    // mutation used for background teammate activity so the injected conflict actually
+    // differs from the current record (stage, value, priority, or owner), instead of just
+    // bumping the version with no real change for the conflict dialog to show.
+    record = randomTeammateMutation(current);
     store.set(id, record);
   }
 
@@ -167,4 +170,21 @@ export function deleteDeal(id: string): void {
   const store = getStore();
   if (!store.has(id)) throw new NotFoundError(id);
   store.delete(id);
+}
+
+let newDealCounter = 0;
+
+/** Creates a brand-new deal from the "Add lead" form — unlike the generated seed data,
+ *  this is the one deal-creation path an actual user drives. */
+export function createDeal(fields: DealMutableFields): Deal {
+  const store = getStore();
+  const id = `lead_${Date.now().toString(36)}_${(newDealCounter++).toString(36)}`;
+  const deal: Deal = {
+    ...fields,
+    id,
+    version: 1,
+    updatedAt: new Date().toISOString(),
+  };
+  store.set(id, deal);
+  return deal;
 }

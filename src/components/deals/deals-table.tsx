@@ -12,7 +12,7 @@ import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { DealSummary } from "@/lib/deals/types";
 import { useDealsStore, SortField } from "@/store/deals-store";
 import { Checkbox } from "@/components/ui/primitives";
-import { EditableText, PrioritySelect, StageSelect, ValueCell } from "./cell-editors";
+import { PrioritySelect, StageSelect, ValueCell } from "./cell-editors";
 import { RowStatusIndicator } from "./row-status";
 import { CompanyAvatar } from "./company-avatar";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
@@ -47,7 +47,11 @@ function columnStyle(columnId: string, size: number): CSSProperties {
     : { flex: `${size} ${size} 0px`, minWidth: 80 };
 }
 
-export function DealsTable({ onOpenDetail }: { onOpenDetail: (id: string) => void }) {
+export function DealsTable({
+  onOpenDetail,
+}: {
+  onOpenDetail: (id: string, mode: "view" | "edit") => void;
+}) {
   const order = useDealsStore((s) => s.order);
   const deals = useDealsStore((s) => s.deals);
   const total = useDealsStore((s) => s.total);
@@ -134,7 +138,7 @@ export function DealsTable({ onOpenDetail }: { onOpenDetail: (id: string) => voi
           <CompanyAvatar name={row.original.company} />
           <div className="min-w-0 text-left">
             <button
-              onClick={() => onOpenDetail(row.original.id)}
+              onClick={() => onOpenDetail(row.original.id, "view")}
               className="block max-w-full truncate text-left font-medium text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
               title={row.original.name}
             >
@@ -173,12 +177,10 @@ export function DealsTable({ onOpenDetail }: { onOpenDetail: (id: string) => voi
       accessorKey: "owner",
       header: "Owner",
       size: 150,
+      // Read-only here on purpose — owner reassignment goes through the detail drawer's
+      // explicit "Update owner" button only, not an inline click-to-edit in the row.
       cell: ({ row }) => (
-        <EditableText
-          value={row.original.owner}
-          disabled={pending[row.original.id]?.status === "saving"}
-          onCommit={(v) => updateDeal(row.original.id, { owner: v }, { undoLabel: "owner change" })}
-        />
+        <span className="block truncate px-1.5 py-1 text-gray-700">{row.original.owner}</span>
       ),
     },
     {
@@ -215,7 +217,7 @@ export function DealsTable({ onOpenDetail }: { onOpenDetail: (id: string) => voi
         const failed = pending[id]?.status === "failed";
         const isArchived = row.original.archived;
         const items: MenuItem[] = [
-          { label: "View details", icon: <Eye className="h-3.5 w-3.5" />, onClick: () => onOpenDetail(id) },
+          { label: "View details", icon: <Eye className="h-3.5 w-3.5" />, onClick: () => onOpenDetail(id, "view") },
           ...(failed
             ? [{ label: "Retry save", icon: <RefreshCw className="h-3.5 w-3.5" />, onClick: () => retry(id) }]
             : []),
@@ -234,7 +236,7 @@ export function DealsTable({ onOpenDetail }: { onOpenDetail: (id: string) => voi
         return (
           <div className="flex items-center justify-center gap-0.5">
             <button
-              onClick={() => onOpenDetail(id)}
+              onClick={() => onOpenDetail(id, "edit")}
               className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
               aria-label={`Edit ${row.original.name}`}
               title="Edit"

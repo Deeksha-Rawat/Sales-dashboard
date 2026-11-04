@@ -90,6 +90,16 @@ export async function patchDeal(
   return res.json();
 }
 
+export async function createDeal(fields: DealMutableFields): Promise<Deal> {
+  const res = await fetch("/api/deals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) throw new ApiError(res.status, "create failed");
+  return res.json();
+}
+
 export async function deleteDeal(id: string): Promise<void> {
   const res = await fetch(`/api/deals/${id}`, { method: "DELETE" });
   if (!res.ok) throw new ApiError(res.status, "delete failed");

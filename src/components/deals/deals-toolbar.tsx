@@ -5,22 +5,22 @@ import { createPortal } from "react-dom";
 import { useDealsStore } from "@/store/deals-store";
 import { PRIORITIES, PRIORITY_LABELS, STAGES, STAGE_LABELS, Priority, Stage } from "@/lib/deals/types";
 import { Input, Badge, Button, Option, Select } from "@/components/ui/primitives";
-import { Archive, LayoutGrid, SlidersHorizontal, Table2, Users, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Archive, RefreshCw, SlidersHorizontal, Users, X } from "lucide-react";
+import { cn, formatRelativeTime } from "@/lib/utils";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-export function DealsToolbar({
-  view,
-  onViewChange,
-}: {
-  view: "table" | "board";
-  onViewChange: (v: "table" | "board") => void;
-}) {
+export function DealsToolbar() {
   const filters = useDealsStore((s) => s.filters);
   const setFilters = useDealsStore((s) => s.setFilters);
   const owners = useDealsStore((s) => s.owners);
   const total = useDealsStore((s) => s.total);
+  const backgroundSync = useDealsStore((s) => s.backgroundSync);
+  // Deliberately NOT `syncing` — that also flips on while the 5s auto-poll is running, which
+  // would make this button look like it's "always refreshing" on its own. It should only
+  // reflect a sync the user asked for by clicking it.
+  const manualSyncing = useDealsStore((s) => s.manualSyncing);
+  const lastRefreshedAt = useDealsStore((s) => s.lastRefreshedAt);
   const [searchDraft, setSearchDraft] = useState(filters.search);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -143,6 +143,18 @@ export function DealsToolbar({
           )}
         </Button>
 
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => void backgroundSync({ manual: true })}
+          disabled={manualSyncing}
+          aria-label="Refresh — pull in any changes teammates made since your last sync, without waiting for the next automatic sync"
+          title="Refresh now (updates also sync automatically every 5s)"
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", manualSyncing && "animate-spin")} />
+          {manualSyncing ? "Refreshing…" : "Refresh"}
+        </Button>
+
         {filtersOpen &&
           pos &&
           typeof document !== "undefined" &&
@@ -203,29 +215,6 @@ export function DealsToolbar({
             </div>,
             document.body
           )}
-
-        <div className="ml-auto flex items-center gap-1 rounded-md border border-gray-300 bg-gray-50 p-0.5">
-          <button
-            onClick={() => onViewChange("table")}
-            aria-pressed={view === "table"}
-            className={cn(
-              "flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors",
-              view === "table" ? "bg-gray-900 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
-            )}
-          >
-            <Table2 className="h-3.5 w-3.5" /> Table
-          </button>
-          <button
-            onClick={() => onViewChange("board")}
-            aria-pressed={view === "board"}
-            className={cn(
-              "flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors",
-              view === "board" ? "bg-gray-900 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
-            )}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" /> Board
-          </button>
-        </div>
       </div>
 
       {hasActiveFilters && (
@@ -249,6 +238,9 @@ export function DealsToolbar({
 
       <span className="flex items-center gap-1 text-xs text-gray-500">
         <Users className="h-3.5 w-3.5" /> {total.toLocaleString()} deals
+        {lastRefreshedAt && (
+          <span className="text-gray-400">· last refreshed {formatRelativeTime(lastRefreshedAt)}</span>
+        )}
       </span>
     </div>
   );

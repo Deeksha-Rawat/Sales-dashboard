@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import {
   ApiError,
   ConflictApiError,
+  createDeal as createDealApi,
   deleteDeal as deleteDealApi,
   fetchDealChanges,
   fetchDealIds,
@@ -70,10 +71,26 @@ interface DealsState {
 
   lastSyncAt: string | null;
   recentlyUpdated: Set<string>;
+  /** True while ANY sync (the 5s auto-poll or a manual Refresh click) is in flight — used for
+   *  background bookkeeping, not UI, since the auto-poll firing shouldn't make the Refresh
+   *  button look busy. See `manualSyncing` for that. */
+  syncing: boolean;
+  /** True only while a sync the user explicitly triggered by clicking Refresh is in flight —
+   *  this is what the toolbar button's spinner/disabled state reflects, so the button doesn't
+   *  appear to "always be refreshing" just because the 5s auto-poll is also running. */
+  manualSyncing: boolean;
+  /** Timestamp of the most recent successful sync, automatic or manual — purely informational
+   *  (the toolbar's "last refreshed Xs ago" subtitle), separate from `lastSyncAt` (the cursor
+   *  used for the changes-since query). */
+  lastRefreshedAt: string | null;
 
   loadDeals: () => Promise<void>;
   loadMoreDeals: () => Promise<void>;
-  backgroundSync: () => Promise<void>;
+  /** Pulls in whatever changed since the last sync. `manual: true` is for the toolbar's
+   *  Refresh button — the 5s auto-poll in page.tsx calls this with no argument. The only
+   *  difference is which busy flag it toggles; the actual sync logic is identical either way,
+   *  so the button is a pure "don't wait for the next tick" fallback, not a separate code path. */
+  backgroundSync: (opts?: { manual?: boolean }) => Promise<void>;
   setFilters: (filters: Partial<Filters>) => void;
   setSort: (sort: SortState) => void;
 
@@ -93,6 +110,7 @@ interface DealsState {
   dismissPending: (id: string) => void;
   undo: () => Promise<void>;
   deleteDeal: (id: string) => Promise<void>;
+  addDeal: (fields: DealMutableFields) => Promise<void>;
 
   applyServerRecord: (summary: DealSummary) => void;
 }
@@ -138,6 +156,9 @@ export const useDealsStore = create<DealsState>((set, get) => ({
 
   lastSyncAt: null,
   recentlyUpdated: new Set(),
+  syncing: false,
+  manualSyncing: false,
+  lastRefreshedAt: null,
 
   /** Replaces the current view — called on initial mount and whenever filters/sort change. */
   loadDeals: async () => {
@@ -209,15 +230,17 @@ export const useDealsStore = create<DealsState>((set, get) => ({
    * since the last sync, without disturbing the current scroll position, selection, or any
    * row mid-edit. Only ever touches rows that aren't currently pending a local save.
    */
-  backgroundSync: async () => {
+  backgroundSync: async (opts) => {
+    const manual = !!opts?.manual;
     const { lastSyncAt } = get();
     if (!lastSyncAt || backgroundSyncInFlight) return;
     backgroundSyncInFlight = true;
+    set(manual ? { syncing: true, manualSyncing: true } : { syncing: true });
 
     try {
       const res = await fetchDealChanges(lastSyncAt);
       if (!res.changed.length) {
-        set({ lastSyncAt: res.serverTime });
+        set({ lastSyncAt: res.serverTime, lastRefreshedAt: res.serverTime });
         return;
       }
 
@@ -259,6 +282,7 @@ export const useDealsStore = create<DealsState>((set, get) => ({
           deals: nextDeals,
           order: nextOrder,
           lastSyncAt: res.serverTime,
+          lastRefreshedAt: res.serverTime,
           recentlyUpdated: nextRecentlyUpdated,
         };
       });
@@ -277,6 +301,7 @@ export const useDealsStore = create<DealsState>((set, get) => ({
       // The next tick will simply try again from the same `lastSyncAt`.
     } finally {
       backgroundSyncInFlight = false;
+      set(manual ? { syncing: false, manualSyncing: false } : { syncing: false });
     }
   },
 
@@ -441,6 +466,32 @@ export const useDealsStore = create<DealsState>((set, get) => ({
       }));
       toast.error("Couldn't delete the deal — restored");
     }
+  },
+
+  // Unlike an edit, there's no local id to apply optimistically until the server assigns
+  // one — the modal shows its own saving state and stays open on failure so nothing typed
+  // is lost. On success the new deal is dropped into the current view only if it actually
+  // matches the active filters, same rule background sync uses for newly-matching rows.
+  addDeal: async (fields) => {
+    const created = await createDealApi(fields);
+    set((s) => {
+      if (!matchesFilters(created, s.filters)) return {};
+      const nextRecentlyUpdated = new Set(s.recentlyUpdated);
+      nextRecentlyUpdated.add(created.id);
+      return {
+        deals: { ...s.deals, [created.id]: created },
+        order: [created.id, ...s.order],
+        total: s.total + 1,
+        recentlyUpdated: nextRecentlyUpdated,
+      };
+    });
+    setTimeout(() => {
+      set((s) => {
+        const next = new Set(s.recentlyUpdated);
+        next.delete(created.id);
+        return { recentlyUpdated: next };
+      });
+    }, 2000);
   },
 }));
 

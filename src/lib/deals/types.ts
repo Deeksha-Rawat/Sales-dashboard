@@ -52,7 +52,17 @@ export interface Deal extends DealSummary {
 
 export type DealMutableFields = Pick<
   Deal,
-  "name" | "company" | "owner" | "value" | "stage" | "priority" | "closeDate" | "notes" | "archived"
+  | "name"
+  | "company"
+  | "owner"
+  | "value"
+  | "stage"
+  | "priority"
+  | "closeDate"
+  | "contactName"
+  | "contactEmail"
+  | "notes"
+  | "archived"
 >;
 
 export interface SimulationConfig {

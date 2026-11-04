@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStore, getSimulationConfig, maybeSimulateTeammateActivity } from "@/lib/deals/server-store";
-import { simulateLatency } from "@/lib/deals/simulate";
+import { createDeal, getStore, getSimulationConfig, maybeSimulateTeammateActivity } from "@/lib/deals/server-store";
+import { shouldFail, simulateLatency } from "@/lib/deals/simulate";
 import { Filters, matchesFilters } from "@/lib/deals/filters";
-import { Deal, DealSummary, ListDealsResponse } from "@/lib/deals/types";
+import { Deal, DealMutableFields, DealSummary, ListDealsResponse } from "@/lib/deals/types";
 
 const PAGE_SIZE = 200;
 
@@ -67,4 +67,34 @@ export async function GET(req: NextRequest) {
   };
 
   return NextResponse.json(response);
+}
+
+export async function POST(req: NextRequest) {
+  const config = getSimulationConfig();
+  await simulateLatency(config);
+
+  const body = (await req.json()) as Partial<DealMutableFields>;
+  if (!body.name?.trim() || !body.company?.trim() || !body.owner) {
+    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
+
+  if (shouldFail(config)) {
+    return NextResponse.json({ error: "server_error" }, { status: 500 });
+  }
+
+  const deal = createDeal({
+    name: body.name.trim(),
+    company: body.company.trim(),
+    owner: body.owner,
+    value: typeof body.value === "number" && body.value >= 0 ? body.value : 0,
+    stage: body.stage ?? "new_lead",
+    priority: body.priority ?? "medium",
+    closeDate: body.closeDate || new Date().toISOString().slice(0, 10),
+    contactName: body.contactName ?? "",
+    contactEmail: body.contactEmail ?? "",
+    notes: body.notes ?? "",
+    archived: false,
+  });
+
+  return NextResponse.json(deal, { status: 201 });
 }

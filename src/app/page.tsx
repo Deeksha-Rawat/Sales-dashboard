@@ -4,21 +4,21 @@ import { useEffect, useState } from "react";
 import { useDealsStore } from "@/store/deals-store";
 import { DealsToolbar } from "@/components/deals/deals-toolbar";
 import { DealsTable } from "@/components/deals/deals-table";
-import { DealsBoard } from "@/components/deals/deals-board";
 import { BulkActionBar } from "@/components/deals/bulk-action-bar";
 import { ConflictDialog } from "@/components/deals/conflict-dialog";
 import { SimulationPanel } from "@/components/deals/simulation-panel";
 import { DealDetailDrawer } from "@/components/deals/deal-detail-drawer";
 import { TableSkeleton } from "@/components/deals/table-skeleton";
-import { BoardSkeleton } from "@/components/deals/board-skeleton";
+import { AddLeadDialog } from "@/components/deals/add-lead-dialog";
 import { useAuthStore } from "@/store/auth-store";
 import { LoginScreen } from "@/components/auth/login-screen";
 import { UserMenu } from "@/components/auth/user-menu";
-import { Workflow } from "lucide-react";
+import { Plus, Workflow } from "lucide-react";
 
 export default function Home() {
-  const [view, setView] = useState<"table" | "board">("table");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailMode, setDetailMode] = useState<"view" | "edit">("view");
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
   const loadDeals = useDealsStore((s) => s.loadDeals);
   const backgroundSync = useDealsStore((s) => s.backgroundSync);
   const loading = useDealsStore((s) => s.loading);
@@ -29,21 +29,15 @@ export default function Home() {
     if (user) loadDeals();
   }, [user, loadDeals]);
 
+  // Automatic background sync every 5s, paused while the tab isn't visible so it doesn't
+  // burn requests on a backgrounded tab — on top of (not instead of) the toolbar's manual
+  // Refresh button, which calls the same `backgroundSync` on demand.
   useEffect(() => {
     if (!user) return;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") void backgroundSync();
-    }, 4000);
-
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void backgroundSync();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+    }, 5000);
+    return () => clearInterval(id);
   }, [user, backgroundSync]);
 
   if (!user) return <LoginScreen />;
@@ -63,7 +57,7 @@ export default function Home() {
         <UserMenu />
       </header>
 
-      <DealsToolbar view={view} onViewChange={setView} />
+      <DealsToolbar />
 
       <main className="flex flex-1 flex-col gap-3 px-4 py-3">
         {loadError && (
@@ -75,22 +69,30 @@ export default function Home() {
           </div>
         )}
         {loading ? (
-          view === "table" ? (
-            <TableSkeleton />
-          ) : (
-            <BoardSkeleton />
-          )
-        ) : view === "table" ? (
-          <DealsTable onOpenDetail={setDetailId} />
+          <TableSkeleton />
         ) : (
-          <DealsBoard onOpenDetail={setDetailId} />
+          <DealsTable
+            onOpenDetail={(id, mode) => {
+              setDetailId(id);
+              setDetailMode(mode);
+            }}
+          />
         )}
       </main>
 
       <BulkActionBar />
       <ConflictDialog />
       <SimulationPanel />
-      <DealDetailDrawer id={detailId} onClose={() => setDetailId(null)} />
+      <DealDetailDrawer id={detailId} mode={detailMode} onClose={() => setDetailId(null)} />
+
+      <button
+        onClick={() => setAddLeadOpen(true)}
+        className="fixed bottom-20 right-4 z-20 flex h-11 items-center gap-1.5 rounded-full bg-blue-600 pl-3.5 pr-4 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+        aria-label="Add a new lead"
+      >
+        <Plus className="h-4.5 w-4.5" /> Add lead
+      </button>
+      <AddLeadDialog open={addLeadOpen} onClose={() => setAddLeadOpen(false)} />
     </div>
   );
 }
