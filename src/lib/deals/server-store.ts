@@ -85,11 +85,12 @@ export function applyUpdate(
 
   let record = current;
   if (injectConflict) {
-    // Simulate a concurrent writer landing a change a moment earlier — reuse the same
-    // mutation used for background teammate activity so the injected conflict actually
-    // differs from the current record (stage, value, priority, or owner), instead of just
-    // bumping the version with no real change for the conflict dialog to show.
-    record = randomTeammateMutation(current);
+    // Simulate a concurrent writer landing a change a moment earlier. Always an owner
+    // reassignment specifically (not the full stage/value/priority/owner mix used for
+    // background teammate activity) — a conflict where every other field already matches
+    // isn't worth interrupting the user over, so the one thing guaranteed to make the two
+    // versions genuinely different is who owns the deal.
+    record = randomOwnerReassignment(current);
     store.set(id, record);
   }
 
@@ -128,6 +129,19 @@ export function maybeSimulateTeammateActivity(config: SimulationConfig): void {
     if (!deal) continue;
     store.set(id, randomTeammateMutation(deal));
   }
+}
+
+/** Used only for the injected-conflict path — always reassigns owner, never any other field,
+ *  so a surfaced conflict dialog always has something real (the owner) for the user to decide
+ *  between, instead of sometimes differing only in a field they don't care about. */
+function randomOwnerReassignment(deal: Deal): Deal {
+  const others = OWNERS.filter((o) => o !== deal.owner);
+  return {
+    ...deal,
+    version: deal.version + 1,
+    updatedAt: new Date().toISOString(),
+    owner: others[Math.floor(Math.random() * others.length)],
+  };
 }
 
 function randomTeammateMutation(deal: Deal): Deal {
